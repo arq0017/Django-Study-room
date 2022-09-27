@@ -1,0 +1,65 @@
+<style>
+  #time {
+    color: red;
+    font-size: 12px;
+  }
+  .room-container {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+  }
+</style>
+
+{% extends 'main.html' %}
+<!-- django template tags -->
+{% block content %}
+
+<div class="room-container">
+  <!-- room desc column -->
+  <div>
+    <h1>{{room.name}}</h1>
+    <h5>{{room.description}}</h5>
+
+    <div class="comment-wrapper">
+      <h3>Conversations</h3>
+      <hr />
+      {% for comment in comments %}
+      <div>
+        {% if request.user == comment.user %}
+        <a
+          href="{% url 'delete-comment' room_id=room.id comment_id=comment.id%}"
+          >Delete</a
+        >
+        {% endif %}
+        <small
+          >@{{comment.user}}<small id="time"
+            >, {{comment.created|timesince}} ago</small
+          ></small
+        >
+        <p>{{comment}}</p>
+      </div>
+      <br />
+      {% endfor %}
+    </div>
+
+    {% if request.user.is_authenticated %}
+    <div class="comment-form">
+      <form method="POST" action="">
+        {% csrf_token %}
+        <input type="text" name="body" placeholder="Write your message here!" />
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- participants column -->
+  <div>
+    <h3>Participants</h3>
+    <hr />
+    <h4>Total participants:{{participants | length}}</h4>
+    {% for participant in participants %}
+    <div>@{{participant.username}}</div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock content %}
