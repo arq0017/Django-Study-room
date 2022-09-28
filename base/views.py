@@ -7,7 +7,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render, redirect
 from .models import Room, Topic, Message
-from .forms import RoomForm
+from .forms import RoomForm, UserForm
 # Create your views here.
 
 
@@ -69,7 +69,7 @@ def home(request):
         Q(host__username__icontains=q)
     )
     room_count = rooms.count()
-    topics = Topic.objects.all()
+    topics = Topic.objects.all()[0:5]
     comments = Message.objects.filter(Q(room__topic__name__icontains=q))
     context = {'rooms': rooms, 'room_count': room_count,
                'topics': topics, 'comments': comments}
@@ -106,38 +106,55 @@ def user_profile(request, user_id):
 
 @login_required
 def create_room(request):
-
+    button_name='Create'
     # when creating form
     if request.method == 'POST':
-        form_submit = RoomForm(request.POST)
-        if form_submit.is_valid():
-            form_obj = form_submit.save(commit=False)
-            form_obj.host = request.user
-            form_obj.save()
-            return redirect('home')
+        topic_name = request.POST.get('topic')
+        topic, created = Topic.objects.get_or_create(name=topic_name)
+        Room.objects.create(
+            host=request.user,
+            topic=topic,
+            name=request.POST.get('name'),
+            description=request.POST.get('description')
+        )
+        # form_submit = RoomForm(request.POST)
+        # if form_submit.is_valid():
+        #     form_obj = form_submit.save(commit=False)
+        #     form_obj.host = request.user
+        #     form_obj.save()
+        return redirect('home')
 
     form = RoomForm()
-    context = {'form': form}
+    topics = Topic.objects.all()
+    context = {'form': form, 'topics': topics, 'button_name': button_name}
     return render(request, 'base/room_form.html', context)
 
 
 @login_required
 def update_room(request, room_id):
+    button_name='Update'
     # get instance
     room = Room.objects.get(id=room_id)
+    topics = Topic.objects.all()
+    form = RoomForm(instance=room)
+
     # restricting updation to the owner
     if request.user != room.host:
         return HttpResponse('You are not allowed to update this room!')
+
     # when updating form
     if request.method == 'POST':
         # for filling the form
-        form_update = RoomForm(request.POST, instance=room)
-        if form_update.is_valid():
-            form_update.save()
-            return redirect('home')
+        topic_name = request.POST.get('topic')
+        topic, created = Topic.objects.get_or_create(name=topic_name)
+        room.name = request.POST.get('name')
+        room.description = request.POST.get('description')
+        room.topic = topic
+        room.save()
+        return redirect('home')
 
-    form = RoomForm(instance=room)
-    context = {'form': form}
+    
+    context = {'form': form, 'topics': topics, 'room': room, 'button_name': button_name}
     return render(request, 'base/room_form.html', context)
 
 
@@ -164,3 +181,28 @@ def delete_comment(request, room_id, comment_id):
         return redirect('room', room_id)
     context = {'obj': message}
     return render(request, 'base/delete.html', context)
+
+@login_required
+def edit_profile(request):
+    user = request.user
+    user_form = UserForm(instance=user)
+    if request.method == 'POST':
+        user_form = UserForm(request.POST, instance=user)
+        if user_form.is_valid():
+            user_form.save()
+        return redirect('user-profile', user.id)
+    context = {'form': user_form}
+    return render(request, 'base/edit-profile.html', context)
+
+
+def topic_page(request):
+    q = request.GET.get('q')
+    q = q if q is not None else ''
+    topics = Topic.objects.filter(name__icontains=q)
+    context = {'topics': topics}
+    return render(request, 'base/topics.html', context)
+
+def activity_page(request):
+    room_messages = Message.objects.all()
+    context = {'comments': room_messages}
+    return render(request, 'base/activity.html', context)
